@@ -4,6 +4,7 @@
 import hashlib
 import json
 import csv
+import math
 from time import time
 from collections import Counter
 
@@ -101,10 +102,23 @@ def update_description_weights(person_name, chosen_index):
     new_weights = {index: count / total_votes for index, count in weights.items()}
     descriptions[person_name]['weights'] = new_weights
     write_description(person_name, descriptions)
-
+    
+    ## This function increments our trust score and stabilizes at a trust score of 1 (going upwards.)
+def increase_trust(x, k=1):
+    return 1 / (1 + math.exp(-k * x))
+    ## This one decreases it and stabilizes at 0
+def decrease_trust(x, k=1):
+    return 1 / (1 + math.exp(k * x))
+    ## k values determine how fast these stabilize, AKA how many chances do we want to give users.
+    
 def update_user_trust_score(user_name, trust_change):
     user_names = read_user_names()
-    user_names[user_name] += trust_change
+    if (trust_change == 1):
+        user_names[user_name] = increase_trust(user_names[user_name], k=1)
+    else:
+        user_names[user_name] = decrease_trust(user_names[user_name], k=1)
+    
+    # Reset trust values if they go out of bounds
     if user_names[user_name] > 1.0:
         user_names[user_name] = 1.0
     elif user_names[user_name] < 0.0:
@@ -148,6 +162,7 @@ friend_name = input("Enter your friend's name: ")
 
 # Check if there are existing descriptions for the friend
 if friend_name in existing_descriptions:
+    existing_descriptions = read_descriptions()
     print("Existing descriptions found for", friend_name)
     friend_descriptions = existing_descriptions[friend_name]['descriptions']
     weights = existing_descriptions[friend_name]['weights']
@@ -160,7 +175,7 @@ if friend_name in existing_descriptions:
         print("You voted for:", friend_descriptions[chosen_index - 1])
         update_description_weights(friend_name, chosen_index)
         # Update user trust score based on their vote
-        trust_change = 0.1 if chosen_index == 1 else -0.05  # Example change in trust score
+        trust_change = 1 if chosen_index == 1 else -1  # Example change in trust score
         update_user_trust_score(new_user_name, trust_change)
     else:
         print("Invalid vote! Please enter a number between 1")
@@ -169,4 +184,3 @@ else:
     print("No existing descriptions found for", friend_name)
     new_description = input("Enter a description for " + friend_name + ": ")
     write_description(friend_name, {'descriptions': [new_description], 'weights': {1: 1.0}})
-
